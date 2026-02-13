@@ -1,4 +1,4 @@
-package modao
+package common
 
 const (
 	ConnectTypeMysql      ConnectType = "mysql"      // mysql
@@ -10,9 +10,4 @@ const (
 type (
 	ConnectType string // 连接类型
 	ConnectName string // 连接名称
-
-	// ConnectInfo 连接信息
-	ConnectInfo struct {
-		ConnectName ConnectName // 连接名称
-	}
 )

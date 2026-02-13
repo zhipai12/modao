@@ -3,40 +3,95 @@ package modao
 import (
 	"sync"
 
+	"github.com/rrzu/modao/common"
 	"gorm.io/gorm"
 )
 
-// gorm连接对象容器
 var gormConnectContainer sync.Map
 
-// RegisterGormDb 注册gorm连接对象
-func RegisterGormDb(connectionInfo ConnectInfo, db *gorm.DB) {
-	if GetGormDb(connectionInfo, false) != nil {
+// ConnectInfo 连接信息
+type ConnectInfo struct {
+	ConnectName common.ConnectName
+	ConnectType common.ConnectType
+}
+
+// ConnectData 连接数据（保持原名）
+type ConnectData struct {
+	Db          *gorm.DB
+	ConnectType common.ConnectType
+}
+
+// RegisterGormDb 注册连接（已存在则忽略）
+func RegisterGormDb(info ConnectInfo, db *gorm.DB) {
+	if info.ConnectName == "" {
+		return
+	}
+	if _, exists := gormConnectContainer.Load(key(info)); !exists {
+		gormConnectContainer.Store(key(info), &ConnectData{
+			Db:          db,
+			ConnectType: info.ConnectType,
+		})
+	}
+}
+
+// ModifyGormDb 强制覆盖更新连接
+func ModifyGormDb(info ConnectInfo, db *gorm.DB) {
+	if info.ConnectName == "" {
 		return
 	}
 
-	gormConnectContainer.Store(key(connectionInfo), db)
+	gormConnectContainer.Store(key(info), &ConnectData{
+		Db:          db,
+		ConnectType: info.ConnectType,
+	})
 }
 
-// ModifyGormDb 修改gorm连接对象
-func ModifyGormDb(connectionInfo ConnectInfo, db *gorm.DB) {
-	gormConnectContainer.Store(key(connectionInfo), db)
-}
-
-// GetGormDb 获取gorm连接对象
-func GetGormDb(connectionInfo ConnectInfo, withDebug bool) (gormDB *gorm.DB) {
+// GetGormDb 获取连接
+func GetGormDb(info ConnectInfo, withDebug bool) (gormDB *gorm.DB) {
 	defer func() {
 		if withDebug && gormDB != nil {
 			gormDB = gormDB.Debug()
 		}
 	}()
 
-	if db, ok := gormConnectContainer.Load(key(connectionInfo)); ok {
-		return db.(*gorm.DB)
+	if info.ConnectName != "" {
+		if v, ok := gormConnectContainer.Load(key(info)); ok {
+			if data, ok := v.(*ConnectData); ok {
+				return data.Db
+			}
+		}
+		return nil
 	}
+
+	// ConnectName 为空 → 按类型取首个
+	var found *ConnectData
+	gormConnectContainer.Range(func(_, val interface{}) bool {
+		if data, ok := val.(*ConnectData); ok && data.ConnectType == info.ConnectType {
+			found = data
+			return false
+		}
+		return true
+	})
+
+	if found != nil {
+		return found.Db
+	}
+
 	return nil
 }
 
-func key(connectionInfo ConnectInfo) string {
-	return string(connectionInfo.ConnectName)
+// GetAllConnectData 获取所有连接数据
+func GetAllConnectData() (res []ConnectData) {
+	gormConnectContainer.Range(func(_, val interface{}) bool {
+		if data, ok := val.(*ConnectData); ok {
+			res = append(res, *data)
+		}
+		return true
+	})
+
+	return
+}
+
+func key(info ConnectInfo) string {
+	return string(info.ConnectName)
 }
