@@ -8,8 +8,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// OutputDir 生成文件的存储路径
-var OutputDir string
+// OutputPath 生成文件路径
+var OutputPath string
 
 // Config 链式配置器
 type Config struct {
@@ -42,8 +42,8 @@ func (c *Config) SetGormDb(connectionInfo ConnectInfo, db *gorm.DB) *Config {
 	return c
 }
 
-// InitGenMd 初始化生成路径并启动服务
-func (c *Config) InitGenMd(path string) *Config {
+// SetGenMdPath 设置生成 md 文件路径
+func (c *Config) SetGenMdPath(path string) *Config {
 	if path == "" {
 		panic("FATAL: 输出路径不能为空 (示例: /app/output)")
 	}
@@ -62,7 +62,7 @@ func (c *Config) InitGenMd(path string) *Config {
 		panic(fmt.Sprintf("FATAL: 无法创建输出目录 [%s]: %v", path, err))
 	}
 
-	OutputDir = path
+	OutputPath = path
 
 	return c
 }

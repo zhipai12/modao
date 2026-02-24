@@ -63,9 +63,9 @@ func getModStmt(connect ConnectData) (mng IGenModMng, err error) {
 		mng = &GenMysqlModMng{
 			ConnectData: connect,
 		}
-	//case _const.DBTypeCh:
-	//case _const.DBTypePg:
-	//case _const.DBTypeHo:
+	// case _const.DBTypeCh:
+	// case _const.DBTypePg:
+	// case _const.DBTypeHo:
 	//	mng = &GenHologresModMng{}
 	default:
 		err = fmt.Errorf("错误类型")
@@ -89,7 +89,7 @@ func GenMdFile(req GenModDaoReq) (filename string, err error) {
 	}
 
 	// 构建文件路径
-	filename = filepath.Join(OutputDir, partPath, common.UnderScoreToCamel(req.TableName)+"_gen.go")
+	filename = filepath.Join(OutputPath, partPath, common.UnderScoreToCamel(req.TableName)+"_gen.go")
 
 	// 转为绝对路径（防御性编程）
 	absDir, err := filepath.Abs(filename)
