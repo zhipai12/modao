@@ -9,12 +9,10 @@ import (
 func main() {
 	(&modao.Config{}).
 		SetDebugKey("onDebug").
-		SetGormDb(modao.ConnectInfo{ConnectName: "mysql-sz-dev", ConnectType: common.ConnectTypeMysql}, RegisterMysql()).
-		// SetGormDb(modao.ConnectData{ConnectName: "hologres-sz-dev"}, &gorm.DB{}).
-		// SetGormDb(modao.ConnectData{ConnectName: "clickhouse-sz-dev"}, &gorm.DB{}).
-		// SetGormDb(modao.ConnectData{ConnectName: "maxcompute-sz-dev"}, &gorm.DB{}).
-		Init().
-		SetGenMdPath("D:\\work\\go\\shuzhi\\app\\test001")
+		SetGormDb(modao.ConnectInfo{ConnectName: "mysql-sz-dev", ConnectType: common.ConnectTypeMysql}, &gorm.DB{}).
+		SetGormDb(modao.ConnectInfo{ConnectName: "hologres-sz-dev", ConnectType: common.ConnectTypeHologres}, &gorm.DB{}).
+		SetGenMdPath("/mnt/d/work/go/go_package/modao").
+		Init()
 
 	// ctx := context.Background()
 	//
@@ -38,8 +36,4 @@ func main() {
 	//
 	// 输出：SELECT * FROM `dim_order_type`
 	// fmt.Println(sql)
-}
-
-func RegisterMysql() (ms *gorm.DB) {
-	return
 }

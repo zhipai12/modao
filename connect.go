@@ -18,7 +18,7 @@ type ConnectInfo struct {
 // ConnectData 连接数据（保持原名）
 type ConnectData struct {
 	Db          *gorm.DB
-	ConnectType common.ConnectType
+	ConnectInfo ConnectInfo
 }
 
 // RegisterGormDb 注册连接（已存在则忽略）
@@ -28,8 +28,11 @@ func RegisterGormDb(info ConnectInfo, db *gorm.DB) {
 	}
 	if _, exists := gormConnectContainer.Load(key(info)); !exists {
 		gormConnectContainer.Store(key(info), &ConnectData{
-			Db:          db,
-			ConnectType: info.ConnectType,
+			Db: db,
+			ConnectInfo: ConnectInfo{
+				ConnectName: info.ConnectName,
+				ConnectType: info.ConnectType,
+			},
 		})
 	}
 }
@@ -41,8 +44,11 @@ func ModifyGormDb(info ConnectInfo, db *gorm.DB) {
 	}
 
 	gormConnectContainer.Store(key(info), &ConnectData{
-		Db:          db,
-		ConnectType: info.ConnectType,
+		Db: db,
+		ConnectInfo: ConnectInfo{
+			ConnectName: info.ConnectName,
+			ConnectType: info.ConnectType,
+		},
 	})
 }
 
@@ -66,7 +72,7 @@ func GetGormDb(info ConnectInfo, withDebug bool) (gormDB *gorm.DB) {
 	// ConnectName 为空 → 按类型取首个
 	var found *ConnectData
 	gormConnectContainer.Range(func(_, val interface{}) bool {
-		if data, ok := val.(*ConnectData); ok && data.ConnectType == info.ConnectType {
+		if data, ok := val.(*ConnectData); ok && data.ConnectInfo.ConnectType == info.ConnectType {
 			found = data
 			return false
 		}

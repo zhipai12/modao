@@ -58,15 +58,17 @@ func Options(connect ConnectData) (options cst.Options[string, any], err error) 
 }
 
 func getModStmt(connect ConnectData) (mng IGenModMng, err error) {
-	switch connect.ConnectType {
+	switch connect.ConnectInfo.ConnectType {
 	case common.ConnectTypeMysql:
 		mng = &GenMysqlModMng{
 			ConnectData: connect,
 		}
 	// case _const.DBTypeCh:
 	// case _const.DBTypePg:
-	// case _const.DBTypeHo:
-	//	mng = &GenHologresModMng{}
+	case common.ConnectTypeHologres:
+		mng = &GenHologresModMng{
+			ConnectData: connect,
+		}
 	default:
 		err = fmt.Errorf("错误类型")
 	}
@@ -115,7 +117,8 @@ func GenMdFile(req GenModDaoReq) (filename string, err error) {
 // GetModStmt 根据数据库类型 获取分析语法树对象
 func GetModStmt(req GenModDaoReq) (mng IGenModMng, err error) {
 	var connect ConnectData
-	connect.ConnectType = req.DBType
+	connect.ConnectInfo.ConnectType = req.DBType
+	connect.ConnectInfo.ConnectName = req.ConnectName
 
 	if mng, err = getModStmt(connect); err != nil {
 		return
@@ -161,12 +164,13 @@ func createModMethods(req GenModDaoReq) (col []string) {
 	case common.ConnectTypeMysql:
 		col = append(col, fmt.Sprintf("\nfunc (m *%s) Table() *modao.MysqlTbl {", modName(req.TableName)))
 		col = append(col, fmt.Sprintf("\n    return &modao.MysqlTbl{\n"))
-		col = append(col, fmt.Sprintf("\t\tConnectInformation: modao.ConnectInfo{\n"))
 	default:
 		panic("该数据库类型暂不支持,请重新选择数据库类型")
 	}
 
-	col = append(col, fmt.Sprintf("\t\t\tConnectName: \"%s\",\n\t\t},\n", req.DBName))
+	col = append(col, fmt.Sprintf("\t\tConnectInformation: modao.ConnectInfo{\n"))
+	col = append(col, fmt.Sprintf("\t\t\tConnectType: \"%s\",\n", req.DBType))
+	col = append(col, fmt.Sprintf("\t\t\tConnectName: \"%s\",\n\t\t},\n", req.ConnectName))
 	col = append(col, fmt.Sprintf("\t\tDatabaseName: \"%s\",\n", req.DBName))
 	col = append(col, fmt.Sprintf("\t\tTableName: \"%s\",\n", req.TableName))
 	col = append(col, fmt.Sprintf("\t}\n"))
@@ -187,8 +191,8 @@ func createDaoMethods(req GenModDaoReq) (col []string) {
 		col = append(col, fmt.Sprintf("\n \t\t\tMysqlBaseDao: modao.NewMysqlBaseDao(&%s{}, withDebug),\n\t\t } \n\t }) \n} \n\n", modName(table)))
 		col = append(col, fmt.Sprintf("type %s struct {\n \t*modao.MysqlBaseDao \n } \n\n", daoName(table)))
 	case common.ConnectTypeHologres:
-		col = append(col, fmt.Sprintf("\n \t\t\tBaseHgDao: INTComp.NewBaseHgDao(INTComp.NewHgOpMod(&%s{})),\n\t\t } \n\t }) \n} \n\n", modName(table)))
-		col = append(col, fmt.Sprintf("type %s struct {\n \t*INTComp.BaseHgDao \n } \n\n", daoName(table)))
+		col = append(col, fmt.Sprintf("\n \t\t\tHologresBaseDao: modao.NewHologresBaseDao(&%s{}, withDebug),\n\t\t } \n\t }) \n} \n\n", modName(table)))
+		col = append(col, fmt.Sprintf("type %s struct {\n \t*modao.HologresBaseDao \n } \n\n", daoName(table)))
 	default:
 		panic("该数据库类型暂不支持,请重新选择数据库类型")
 	}
@@ -200,12 +204,14 @@ func createDaoMethods(req GenModDaoReq) (col []string) {
 func GenAppendToFile(filename string, content string) (err error) {
 	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
+		fmt.Printf("错误 %s", err)
 		return fmt.Errorf("无法打开已存在文件: %w", err)
 	}
 	defer file.Close()
 
 	_, err = file.WriteString(content)
 	if err != nil {
+		fmt.Printf("错误 %s", err)
 		return fmt.Errorf("写入文件失败: %w", err)
 	}
 

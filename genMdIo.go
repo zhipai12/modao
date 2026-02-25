@@ -16,11 +16,12 @@ type (
 type (
 	// GenModDaoReq 生成 mod req
 	GenModDaoReq struct {
-		DBType      common.ConnectType `form:"dbType" json:"dbType" binding:"required"`       // 数据库类型
-		DBName      string             `form:"dbName" json:"dbName" binding:"required"`       // 数据库名称
-		PatternName string             `form:"patternName" json:"patternName"`                // 数据库模式名称
-		TableName   string             `form:"tableName" json:"tableName" binding:"required"` // 表名
-		IsCover     bool               `form:"isCover" json:"isCover"`                        // 是否覆盖
+		DBType      common.ConnectType `form:"dbType" json:"dbType" binding:"required"`           // 数据库类型
+		ConnectName common.ConnectName `form:"connectName" json:"connectName" binding:"required"` // 连接名称
+		DBName      string             `form:"dbName" json:"dbName" binding:"required"`           // 数据库名称
+		PatternName string             `form:"patternName" json:"patternName"`                    // 数据库模式名称
+		TableName   string             `form:"tableName" json:"tableName" binding:"required"`     // 表名
+		IsCover     bool               `form:"isCover" json:"isCover"`                            // 是否覆盖
 	}
 
 	// GenModDaoRsp 生成 mod rsp

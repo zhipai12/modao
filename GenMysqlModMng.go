@@ -39,10 +39,13 @@ func (g *GenMysqlModMng) Options() (rsp cst.Options[string, any], err error) {
 }
 
 func (g *GenMysqlModMng) SetGenModReq(req GenModDaoReq) {
-	connectInfo := ConnectInfo{ConnectType: req.DBType}
+	connectInfo := ConnectInfo{
+		ConnectType: req.DBType,
+		ConnectName: req.ConnectName,
+	}
 
 	g.Req = req
-	g.ConnectData.ConnectType = req.DBType
+	g.ConnectData.ConnectInfo.ConnectType = req.DBType
 	g.ConnectData.Db = GetGormDb(connectInfo, true)
 }
 
