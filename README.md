@@ -36,14 +36,22 @@ SetGormDb(modao.ConnectInfo{ConnectName: _const.ConnectNameMysqlShenzhen, Connec
 SetGenMdPath(filepath.Join((func() string { wd, _ := os.Getwd(); return wd })(), "repository")). // 生成 mod 和 dao 路径
 Init()
 
-// 可视化生成 mod和 dao配置
-func noProdPages(engine *gin.Engine) {
-    apiGroup := engine.Group("/noProd")
-    apiGroup.GET("/genModDao/options", GenModDaoOptions()) // 获取选项
-    apiGroup.POST("/genModDao/convert", GenModDaoConvert()) // 生成 mod dao 模块
+// 引入静态文件以及配置路由
+func NoProdPages(engine *gin.Engine) {
+    staticHandler, _ := static.StaticHandler()
 
-    // 静态资源最后注册（/noProd 节点下仅有通配符，绝对安全）
-    static.SetupSPA(engine)
+    // 将 /noProds 重定向到 /noProds/
+    engine.GET(static.StaticPath, func(c *gin.Context) {
+        c.Redirect(http.StatusMovedPermanently, static.StaticPath+"/")
+    })
+
+    // 处理所有 /noProds/ 下的子路径
+    engine.Any(static.StaticPath+"/*filepath", gin.WrapH(staticHandler))
+
+    // 生成 mod 和 dao 路由
+    var noProdGenModDaoGroupRoute = engine.Group("/noProd/genModDao")
+    noProdGenModDaoGroupRoute.GET("/options", GenModDaoOptions)
+    noProdGenModDaoGroupRoute.POST("/convert", GenModDaoConvert)
 }
 
 func GenModDaoOptions(ctx *gin.Context) {
