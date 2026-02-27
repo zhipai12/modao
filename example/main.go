@@ -1,6 +1,9 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/rrzu/modao"
 	"github.com/rrzu/modao/common"
 	"gorm.io/gorm"
@@ -11,7 +14,7 @@ func main() {
 		SetDebugKey("onDebug").
 		SetGormDb(modao.ConnectInfo{ConnectName: "mysql-sz-dev", ConnectType: common.ConnectTypeMysql}, &gorm.DB{}).
 		SetGormDb(modao.ConnectInfo{ConnectName: "hologres-sz-dev", ConnectType: common.ConnectTypeHologres}, &gorm.DB{}).
-		SetGenMdPath("/mnt/d/work/go/go_package/modao").
+		SetGenMdPath(filepath.Join((func() string { wd, _ := os.Getwd(); return wd })(), "repository")).
 		Init()
 
 	// ctx := context.Background()

@@ -99,6 +99,35 @@ func FirstToLower(s string) string {
 	return strings.ToLower(string(s[0])) + s[1:]
 }
 
+// SnakeToPascal 将下划线分隔的字符串转换为大驼峰命名（首字母大写，其余单词首字母大写，删除下划线）
+// 示例： "ab_cd" -> "AbCd", "hello_world" -> "HelloWorld"
+func SnakeToPascal(s string) string {
+	if s == "" {
+		return ""
+	}
+
+	var result strings.Builder
+	nextUpper := true // 标记下一个字符是否需要转为大写（处理首字母和下划线后的字母）
+
+	for _, ch := range s {
+		if ch == '_' {
+			nextUpper = true // 遇到下划线，下一个字符需要大写
+			continue
+		}
+
+		if nextUpper {
+			// 当前字符需要大写（首字母或下划线后的首字母）
+			result.WriteString(strings.ToUpper(string(ch)))
+			nextUpper = false
+		} else {
+			// 非首字母统一转为小写，保持驼峰风格
+			result.WriteString(strings.ToLower(string(ch)))
+		}
+	}
+
+	return result.String()
+}
+
 // StdSuccess 通用成功
 func StdSuccess[T any](data T, msg ...string) Resp[T] {
 	var (

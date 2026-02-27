@@ -3,6 +3,9 @@ package modao
 import (
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 
@@ -73,6 +76,71 @@ func getModStmt(connect ConnectData) (mng IGenModMng, err error) {
 		err = fmt.Errorf("错误类型")
 	}
 	return
+}
+
+// GenConstContent 生成常量内容
+func GenConstContent(req GenModDaoReq) (err error) {
+	var (
+		partPath    string
+		constName   string
+		constVal    string
+		constType   string
+		packageName string
+	)
+
+	switch req.DBType {
+	case common.ConnectTypeMysql:
+		partPath = filepath.Join("ms")
+		constName = common.SnakeToPascal(req.DBName)
+		constVal = req.DBName
+		constType = "modao.MysqlDatabaseName"
+		packageName = "ms"
+	case common.ConnectTypeHologres:
+		partPath = filepath.Join("hg", "data_analysis")
+		constName = common.SnakeToPascal(req.PatternName)
+		constVal = req.PatternName
+		constType = "modao.HologresPatternName"
+		packageName = "data_analysis"
+	default:
+		return errors.New("该数据库类型暂不支持，请重新选择数据库类型")
+	}
+
+	filePath := filepath.Join(OutputPath, partPath, "const_gen.go")
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return fmt.Errorf("获取绝对路径失败: %w", err)
+	}
+
+	exists := common.CheckFileIsExist(absPath)
+	if exists {
+		// 文件已存在, 检查添加常量
+		err = EnsureConstInFile(absPath, constName, constType, constVal)
+		if err != nil {
+			return fmt.Errorf("确保常量失败: %w", err)
+		}
+		return nil
+	}
+
+	// 文件不存在：创建并写入初始内容
+	if err = common.CreateFile(absPath); err != nil {
+		return fmt.Errorf("创建文件失败: %w", err)
+	}
+
+	// 4.2 打开文件准备写入
+	file, err := os.OpenFile(absPath, os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return fmt.Errorf("打开文件失败: %w", err)
+	}
+	defer file.Close()
+
+	content := fmt.Sprintf("package %s\n\nimport \"github.com/rrzu/modao\"\n\nconst %s %s = \"%s\"\n",
+		packageName, constName, constType, constVal)
+
+	if _, err = file.WriteString(content); err != nil {
+		return fmt.Errorf("写入文件内容失败: %w", err)
+	}
+
+	return nil
 }
 
 // GenMdFile 生成 mod and dao 文件
@@ -149,30 +217,35 @@ func daoName(tblName string) string {
 
 // 创建 mod struct 的方法
 func createModMethods(req GenModDaoReq) (col []string) {
-	col = append(col, fmt.Sprintf("\nfunc (m *%s) TableName() string {", modName(req.TableName)))
+	tableName := req.TableName
+	modelName := modName(tableName)
+	pascalTable := common.SnakeToPascal(tableName)
+
+	// TableName 方法
+	col = append(col, fmt.Sprintf("\nfunc (m *%s) TableName() string {", modelName))
 	col = append(col, fmt.Sprintf("\n    return string(m.Table().TableName)"))
 	col = append(col, fmt.Sprintf("\n}\n"))
 
+	// Table 方法头（根据数据库类型不同）
 	switch req.DBType {
-	case common.ConnectTypeClickhouse:
-		col = append(col, fmt.Sprintf("\nfunc (m *%s) Table() *modao.ClickhouseTbl {", modName(req.TableName)))
-		col = append(col, fmt.Sprintf("\n    return &modao.ClickhouseTbl{\n"))
 	case common.ConnectTypeHologres:
-		col = append(col, fmt.Sprintf("\nfunc (m *%s) Table() *modao.HologresTbl {", modName(req.TableName)))
+		col = append(col, fmt.Sprintf("\nfunc (m *%s) Table() *modao.HologresTbl {", modelName))
 		col = append(col, fmt.Sprintf("\n    return &modao.HologresTbl{\n"))
-		col = append(col, fmt.Sprintf("\t\tPatternName: \"%s\",\n", req.PatternName))
+		col = append(col, fmt.Sprintf("\t\tPatternName: data_analysis.%s,\n", common.SnakeToPascal(req.PatternName))) // Hologres 独有字段
 	case common.ConnectTypeMysql:
-		col = append(col, fmt.Sprintf("\nfunc (m *%s) Table() *modao.MysqlTbl {", modName(req.TableName)))
+		col = append(col, fmt.Sprintf("\nfunc (m *%s) Table() *modao.MysqlTbl {", modelName))
 		col = append(col, fmt.Sprintf("\n    return &modao.MysqlTbl{\n"))
+		col = append(col, fmt.Sprintf("\t\tDatabaseName: ms.%s,\n", common.SnakeToPascal(req.DBName)))
 	default:
 		panic("该数据库类型暂不支持,请重新选择数据库类型")
 	}
 
+	// 公共字段部分
 	col = append(col, fmt.Sprintf("\t\tConnectInformation: modao.ConnectInfo{\n"))
-	col = append(col, fmt.Sprintf("\t\t\tConnectType: \"%s\",\n", req.DBType))
-	col = append(col, fmt.Sprintf("\t\t\tConnectName: \"%s\",\n\t\t},\n", req.ConnectName))
-	col = append(col, fmt.Sprintf("\t\tDatabaseName: \"%s\",\n", req.DBName))
-	col = append(col, fmt.Sprintf("\t\tTableName: \"%s\",\n", req.TableName))
+	col = append(col, fmt.Sprintf("\t\t\tConnectType: common.%s,\n", common.ConnectTypeName(req.DBType)))
+	col = append(col, fmt.Sprintf("\t\t\tConnectName: \"%s\",\n", req.ConnectName))
+	col = append(col, fmt.Sprintf("\t\t},\n"))
+	col = append(col, fmt.Sprintf("\t\tTableName: %s,\n", pascalTable))
 	col = append(col, fmt.Sprintf("\t}\n"))
 	col = append(col, fmt.Sprintf("}"))
 
@@ -180,19 +253,42 @@ func createModMethods(req GenModDaoReq) (col []string) {
 }
 
 // 创建 dao struct 的方法
+// createDaoMethods 生成 dao struct 的方法
 func createDaoMethods(req GenModDaoReq) (col []string) {
-	table := req.TableName
+	tableName := req.TableName
+	pascalTable := common.SnakeToPascal(tableName)
+	daoNameStr := daoName(tableName)
+	modelNameStr := modName(tableName)
 
-	col = append(col, fmt.Sprintf("var %sSingle modao.SingleDao[*%s] \n\n", common.FirstToLower(daoName(table)), daoName(table)))
-	col = append(col, fmt.Sprintf("func Instance%s(ctx context.Context) *%s {\n \treturn %sSingle.Do(ctx, func(withDebug bool) *%s {\n \t\treturn &%s{", daoName(table), daoName(table), common.FirstToLower(daoName(table)), daoName(table), daoName(table)))
-
+	// 常量定义（根据数据库类型不同）
+	var constLine string
 	switch req.DBType {
 	case common.ConnectTypeMysql:
-		col = append(col, fmt.Sprintf("\n \t\t\tMysqlBaseDao: modao.NewMysqlBaseDao(&%s{}, withDebug),\n\t\t } \n\t }) \n} \n\n", modName(table)))
-		col = append(col, fmt.Sprintf("type %s struct {\n \t*modao.MysqlBaseDao \n } \n\n", daoName(table)))
+		constLine = fmt.Sprintf("const %s modao.MysqlTableName = \"%s\"\n\n", pascalTable, tableName)
 	case common.ConnectTypeHologres:
-		col = append(col, fmt.Sprintf("\n \t\t\tHologresBaseDao: modao.NewHologresBaseDao(&%s{}, withDebug),\n\t\t } \n\t }) \n} \n\n", modName(table)))
-		col = append(col, fmt.Sprintf("type %s struct {\n \t*modao.HologresBaseDao \n } \n\n", daoName(table)))
+		constLine = fmt.Sprintf("const %s modao.HologresTableName = \"%s\"\n\n", pascalTable, tableName)
+	default:
+		panic("该数据库类型暂不支持,请重新选择数据库类型")
+	}
+
+	col = append(col, constLine)
+
+	// SingleDao 变量声明
+	col = append(col, fmt.Sprintf("var %sSingle modao.SingleDao[*%s] \n\n", common.FirstToLower(daoNameStr), daoNameStr))
+
+	// Instance 函数开始部分
+	instanceStart := fmt.Sprintf("func Instance%s(ctx context.Context) *%s {\n \treturn %sSingle.Do(ctx, func(withDebug bool) *%s {\n \t\treturn &%s{",
+		daoNameStr, daoNameStr, common.FirstToLower(daoNameStr), daoNameStr, daoNameStr)
+	col = append(col, instanceStart)
+
+	// 根据数据库类型生成基础 Dao 初始化和结构体定义
+	switch req.DBType {
+	case common.ConnectTypeMysql:
+		col = append(col, fmt.Sprintf("\n \t\t\tMysqlBaseDao: modao.NewMysqlBaseDao(&%s{}, withDebug),\n\t\t } \n\t }) \n} \n\n", modelNameStr))
+		col = append(col, fmt.Sprintf("type %s struct {\n \t*modao.MysqlBaseDao \n } \n\n", daoNameStr))
+	case common.ConnectTypeHologres:
+		col = append(col, fmt.Sprintf("\n \t\t\tHologresBaseDao: modao.NewHologresBaseDao(&%s{}, withDebug),\n\t\t } \n\t }) \n} \n\n", modelNameStr))
+		col = append(col, fmt.Sprintf("type %s struct {\n \t*modao.HologresBaseDao \n } \n\n", daoNameStr))
 	default:
 		panic("该数据库类型暂不支持,请重新选择数据库类型")
 	}
@@ -216,4 +312,37 @@ func GenAppendToFile(filename string, content string) (err error) {
 	}
 
 	return
+}
+
+// EnsureConstInFile 检查指定 Go 文件中是否存在常量 constName。
+func EnsureConstInFile(filename, constName, constType, constValue string) error {
+	fileSet := token.NewFileSet()
+	astFile, err := parser.ParseFile(fileSet, filename, nil, parser.ParseComments)
+	if err != nil {
+		return err
+	}
+
+	// 遍历 AST 查找常量
+	for _, decl := range astFile.Decls {
+		genDecl, ok := decl.(*ast.GenDecl)
+		if !ok || genDecl.Tok != token.CONST {
+			continue
+		}
+		for _, spec := range genDecl.Specs {
+			for _, name := range spec.(*ast.ValueSpec).Names {
+				if name.Name == constName {
+					return nil // 已存在
+				}
+			}
+		}
+	}
+
+	// 追加常量定义（前置换行避免粘连）
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	_, err = file.WriteString(fmt.Sprintf("\nconst %s %s = \"%s\"", constName, constType, constValue))
+	return err
 }
