@@ -4,23 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"unicode"
-)
-
-type (
-	// Resp 标准输出
-	Resp[T any] struct {
-		Code    int    `json:"code"`    // 状态码
-		Status  int    `json:"status"`  // 状态码
-		Message string `json:"message"` // 提示信息
-		Data    T      `json:"data"`    // 数据
-		Meta    Meta   `json:"meta"`    // 其他数据
-	}
-
-	// Meta 其他数据
-	Meta map[string]interface{}
 )
 
 // TernaryAny 三元运算
@@ -30,16 +15,6 @@ func TernaryAny[T any](ok bool, okDo T, noOkDo T) T {
 	}
 
 	return noOkDo
-}
-
-// IsValidConnectType 验证连接类型是否有效
-func IsValidConnectType(ct ConnectType) bool {
-	switch ct {
-	case ConnectTypeMysql, ConnectTypeHologres, ConnectTypeClickhouse, ConnectTypeMaxcompute:
-		return true
-	default:
-		return false
-	}
 }
 
 // UnderScoreToCamel 将下划线分隔的字符串转换为驼峰式字符串
@@ -100,7 +75,6 @@ func FirstToLower(s string) string {
 }
 
 // SnakeToPascal 将下划线分隔的字符串转换为大驼峰命名（首字母大写，其余单词首字母大写，删除下划线）
-// 示例： "ab_cd" -> "AbCd", "hello_world" -> "HelloWorld"
 func SnakeToPascal(s string) string {
 	if s == "" {
 		return ""
@@ -126,37 +100,4 @@ func SnakeToPascal(s string) string {
 	}
 
 	return result.String()
-}
-
-// StdSuccess 通用成功
-func StdSuccess[T any](data T, msg ...string) Resp[T] {
-	var (
-		status  = 0
-		message = ""
-	)
-
-	if len(msg) > 0 {
-		message = msg[0]
-	} else {
-		message = strconv.Itoa(status)
-	}
-
-	return Resp[T]{
-		Code:    200,
-		Status:  status,
-		Data:    data,
-		Message: message,
-	}
-}
-
-// StdFail 通用错误
-func StdFail(msg string, status int) Resp[string] {
-	var r Resp[string]
-
-	r.Code = 200
-	r.Data = ""
-	r.Message = msg
-	r.Status = status
-
-	return r
 }
